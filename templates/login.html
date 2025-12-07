@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng Nhập - UTH FaceID</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        /* CSS Style */
+        :root {
+            --primary-color: #00897B;
+            --bg-color: #158C8F;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-card {
+            background: white;
+            width: 100%;
+            max-width: 420px;
+            padding: 40px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        .logo img {
+            height: 60px;
+            margin-bottom: 20px;
+        }
+
+        .title {
+            color: #D32F2F;
+            font-size: 22px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        /* Nút mở Camera */
+        .btn-init-face {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed var(--primary-color);
+            background-color: #E0F2F1;
+            color: var(--primary-color);
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .btn-init-face:hover {
+            background-color: #B2DFDB;
+        }
+
+        .video-container {
+            display: none;
+            /* Mặc định ẩn */
+            width: 100%;
+            height: 250px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+            border: 2px solid #ccc;
+        }
+
+        .video-container.ok {
+            border-color: #00E676;
+            box-shadow: 0 0 15px #00E676;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #overlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 10px;
+            color: white;
+            font-weight: bold;
+            width: 100%;
+            text-shadow: 1px 1px 2px black;
+            left: 0;
+            text-align: center;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: not-allowed;
+            opacity: 0.6;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-card">
+        <div class="logo">
+            <img src="/static/img/logo_uth.png" alt="UTH Logo">
+        </div>
+        <h2 class="title">Đăng Nhập</h2>
+        <p style="margin-bottom: 20px; color: #666;">Bảo mật 2 lớp: Mật khẩu + Khuôn mặt</p>
+
+        <form id="loginForm">
+            <input type="text" id="username" class="form-input" placeholder="Tên tài khoản" required>
+            <input type="password" id="password" class="form-input" placeholder="Mật khẩu" required>
+
+            <!-- Nút bật camera -->
+            <button type="button" class="btn-init-face" id="btnInitFace" onclick="startCamera()">
+                <span class="material-icons">face</span> Bắt đầu xác thực khuôn mặt
+            </button>
+
+            <div class="video-container" id="cameraBox">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="overlayCanvas"></canvas>
+                <p class="status-text" id="statusMsg">Đang khởi động...</p>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">ĐANG CHỜ XÁC THỰC...</button>
+        </form>
+
+        <!-- Link chuyển trang -->
+        <p style="margin-top: 15px; font-size: 14px;">
+            <a href="/register" style="color: #D32F2F; font-weight: bold; text-decoration: none;">Chưa có tài khoản? Đăng ký ngay</a>
+        </p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/face-api.min.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const cameraBox = document.getElementById('cameraBox');
+        const btnInitFace = document.getElementById('btnInitFace');
+        const statusMsg = document.getElementById('statusMsg');
+        const submitBtn = document.getElementById('submitBtn');
+
+        let isProcessing = false; // Biến cờ (Flag) để chặn spam request
+
+        // 1. Load Model
+        async function loadModel() {
+            // Dùng đường dẫn tương đối để tránh lỗi
+            const MODEL_URL = '/models';
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                console.log("Model loaded");
+            } catch (error) {
+                console.error("Lỗi tải model:", error);
+                statusMsg.innerText = "Lỗi tải Model AI";
+            }
+        }
+        window.addEventListener('load', loadModel);
+
+        // 2. Hàm bật Camera
+        async function startCamera() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+
+            if (!user || !pass) {
+                alert("Vui lòng nhập Tài khoản và Mật khẩu trước khi xác thực!");
+                return;
+            }
+
+            btnInitFace.style.display = 'none';
+            cameraBox.style.display = 'block';
+            statusMsg.innerText = "Đang khởi động Camera...";
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                video.srcObject = stream;
+                startDetection();
+            } catch (err) {
+                console.error(err);
+                alert("Không thể mở Camera! Vui lòng kiểm tra quyền truy cập.");
+                stopCameraAndReset();
+            }
+        }
+
+        // 3. Hàm Dừng Camera an toàn
+        function stopCameraAndReset() {
+            try {
+                // A. Dừng luồng Camera
+                if (video.srcObject) {
+                    const tracks = video.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                    video.srcObject = null;
+                }
+            } catch (e) {
+                console.log("Camera đã tắt hoặc lỗi khi tắt:", e);
+            }
+
+            // B. Reset UI
+            isProcessing = false;
+            cameraBox.style.display = 'none';
+            btnInitFace.style.display = 'flex';
+
+            submitBtn.innerText = "ĐANG CHỜ XÁC THỰC...";
+            submitBtn.style.backgroundColor = "";
+            submitBtn.classList.remove('active');
+            statusMsg.innerText = "Đang khởi động...";
+            statusMsg.style.color = "white";
+
+            // C. Xóa canvas
+            try {
+                const canvas = document.getElementById('overlayCanvas');
+                const context = canvas.getContext('2d');
+                context.clearRect(0, 0, canvas.width, canvas.height);
+            } catch (e) {}
+        }
+
+        // 4. Vòng lặp nhận diện
+        function startDetection() {
+            const canvas = document.getElementById('overlayCanvas');
+
+            video.onloadedmetadata = () => {
+                const displaySize = { width: video.videoWidth, height: video.videoHeight };
+                faceapi.matchDimensions(canvas, displaySize);
+
+                const interval = setInterval(async () => {
+                    if (!video.srcObject || isProcessing) {
+                        clearInterval(interval);
+                        return;
+                    }
+
+                    try {
+                        const detections = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
+                        const context = canvas.getContext('2d');
+                        context.clearRect(0, 0, canvas.width, canvas.height);
+
+                        if (detections && detections.score > 0.7) {
+                            cameraBox.classList.add('ok');
+                            statusMsg.innerText = "Đã nhận diện! Đang đăng nhập...";
+                            statusMsg.style.color = "#00E676";
+
+                            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                            new faceapi.draw.DrawBox(resizedDetections.box, { boxColor: '#00E676' }).draw(canvas);
+
+                            // === CHỐT ĐƠN ===
+                            clearInterval(interval);
+                            isProcessing = true;
+
+                            const tmpCanvas = document.createElement('canvas');
+                            tmpCanvas.width = video.videoWidth;
+                            tmpCanvas.height = video.videoHeight;
+                            tmpCanvas.getContext('2d').drawImage(video, 0, 0);
+                            const imageBase64 = tmpCanvas.toDataURL('image/jpeg', 0.9);
+
+                            performLogin(imageBase64);
+                        } else {
+                            cameraBox.classList.remove('ok');
+                            statusMsg.innerText = "Đang tìm khuôn mặt...";
+                            statusMsg.style.color = "white";
+                        }
+                    } catch (err) {
+                        console.log("Lỗi trong quá trình detect:", err);
+                    }
+                }, 200);
+            };
+        }
+
+        // 5. Gọi API Backend
+        async function performLogin(imageBase64) {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            submitBtn.innerText = "ĐANG XỬ LÝ...";
+            submitBtn.style.backgroundColor = "#E65100";
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        image_base64: imageBase64
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    submitBtn.innerText = "THÀNH CÔNG";
+                    submitBtn.style.backgroundColor = "#00E676";
+
+                    localStorage.setItem('currentUser', username);
+                    stopCameraAndReset();
+                    // Chuyển trang
+                    setTimeout(() => {
+                        window.location.href = '/home';
+                    }, 500);
+
+                } else {
+                    // === LỖI TỪ SERVER TRẢ VỀ (Sai pass/mặt) ===
+                    alert("❌ Lỗi: " + data.detail);
+                    stopCameraAndReset();
+                }
+
+            } catch (err) {
+                // === LỖI MẠNG HOẶC CODE JS ===
+                console.error("Chi tiết lỗi:", err); // Xem lỗi thật ở Console F12
+                alert("Lỗi kết nối Server! (Xem console F12 để biết chi tiết)");
+                stopCameraAndReset();
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trang Chủ - UTH System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary-color: #00897B; --bg-color: #158C8F; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+        .welcome-card {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 { color: #333; font-size: 28px; margin-bottom: 10px; }
+        .username { color: var(--primary-color); font-weight: 800; font-size: 32px; display: block; margin-top: 10px; text-transform: uppercase;}
+        p { color: #666; margin-top: 20px; }
+
+        .btn-logout {
+            margin-top: 30px;
+            padding: 10px 25px;
+            background-color: #D32F2F;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn-logout:hover { background-color: #B71C1C; transform: scale(1.05); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="welcome-card">
+        <h1>Chào mừng quay trở lại</h1>
+        <!-- Nơi hiển thị tên User -->
+        <span class="username" id="displayUser">...</span>
+
+        <p>Bạn đã đăng nhập thành công.</p>
+
+        <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+
+    <script>
+        // 1. Lấy tên User từ bộ nhớ trình duyệt (LocalStorage)
+        const currentUser = localStorage.getItem('currentUser');
+
+        // 2. Kiểm tra bảo mật cơ bản: Nếu chưa đăng nhập thì đá về trang Login
+        if (!currentUser) {
+            alert("Bạn chưa đăng nhập!");
+            window.location.href = '/login';
+        } else {
+            // 3. Hiển thị tên lên màn hình
+            document.getElementById('displayUser').innerText = currentUser;
+        }
+
+        // 4. Hàm đăng xuất
+        function logout() {
+            localStorage.removeItem('currentUser'); // Xóa phiên đăng nhập
+            window.location.href = '/login'; // Quay về login
+        }
+    </script>
+</body>
+</html>
